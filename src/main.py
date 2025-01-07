@@ -1,25 +1,51 @@
-import numpy as np
 import matplotlib.pyplot as plt
-# import jax.numpy as np
-from numpy.random import randn
+import jax
+import jax.numpy as jnp
+from numpy.random import rand, randn
 
 N = 50
 
 kappa = 9.96e-4
 a0 = 1e-4
 
+@jax.jit
+def jax_update_velocity(xs, ys, vx, vy, signs, D):
+        for j in range(len(xs)):
+            # if signs[j] == 0:
+            #     continue
+            vx.at[j].set(0)
+            vy.at[j].set(0)
+            for xshift in [-D, D]:
+                for yshift in [-D, D]:
+                    x_jk = xs[j] - xs + xshift
+                    y_jk = ys[j] - ys + yshift
+                    r_jk = jnp.sqrt(x_jk**2 + y_jk**2)
+                    vxk = -kappa/4/jnp.pi/r_jk**2*y_jk*signs
+                    vyk = kappa/4/jnp.pi/r_jk**2*x_jk*signs
+                    vx.at[j].add(jnp.sum(vxk))
+                    vy.at[j].add(jnp.sum(vyk))
+            
+            x_jk = xs[j] - xs
+            y_jk = ys[j] - ys
+            r_jk = jnp.sqrt(x_jk**2 + y_jk**2)
+            vxk = -kappa/4/jnp.pi/r_jk**2*y_jk*signs
+            vyk = kappa/4/jnp.pi/r_jk**2*x_jk*signs
+            vxk.at[j].set(0)
+            vyk.at[j].set(0)
+            vx.at[j].add(jnp.sum(vxk))
+            vy.at[j].add(jnp.sum(vyk))
+
 class VortexPoints:
     def __init__(self, N, D=1):
         self.N = N
         self.D = D
-        self.xs = np.zeros(N)
-        self.ys = np.zeros(N)
-        self.xs += randn(N)*D
-        self.ys += randn(N)*D
-        self.vx = np.zeros_like(self.xs)
-        self.vy = np.zeros_like(self.ys)
-        self.signs = np.ones(N)
-        self.signs[N//2:] = -1
+        self.xs = jnp.array(rand(N)*D)
+        self.ys = jnp.array(rand(N)*D)
+        self.vx = jnp.zeros_like(self.xs)
+        self.vy = jnp.zeros_like(self.ys)
+        self.signs = jnp.ones(N).at[(N//2):].set(-1)
+        print(self.signs)
+        print(self.xs)
 
     def plot(self, ax):
         ixp = self.signs > 0
@@ -27,54 +53,16 @@ class VortexPoints:
         ax.scatter(self.xs[ixp], self.ys[ixp], color='r')
         ax.scatter(self.xs[ixn], self.ys[ixn], color='b')
     
-    def update_velocity(self):
-        for j in range(self.N):
-            if self.signs[j] == 0:
-                continue
-            self.vx[j] = 0
-            self.vy[j] = 0
-            for k in range(self.N):
-                for xshift in [-self.D, 0, self.D]:
-                    for yshift in [-self.D, 0, self.D]:
-                        if k == j and xshift == 0 and yshift == 0:
-                            continue
-                        x_jk = self.xs[k] - self.xs[j] + xshift
-                        y_jk = self.ys[k] - self.ys[j] + yshift
-                        r_jk = np.sqrt(x_jk**2 + y_jk**2)
-                        self.vx[j] += -kappa/4/np.pi/r_jk**2*y_jk*self.signs[k]
-                        self.vy[j] += kappa/4/np.pi/r_jk**2*x_jk*self.signs[k]
-    
     def update_velocity_vector(self):
-        for j in range(self.N):
-            if self.signs[j] == 0:
-                continue
-            self.vx[j] = 0
-            self.vy[j] = 0
-            # vxk = 0
-            # vyk = 0
-            for xshift in [-self.D, 0, self.D]:
-                for yshift in [-self.D, 0, self.D]:
-                    x_jk = self.xs[j] - self.xs + xshift
-                    y_jk = self.ys[j] - self.ys + yshift
-                    r_jk = np.sqrt(x_jk**2 + y_jk**2)
-                    vxk = -kappa/4/np.pi/r_jk**2*y_jk*self.signs
-                    vyk = kappa/4/np.pi/r_jk**2*x_jk*self.signs
-                    if xshift == 0 and yshift == 0:
-                        vxk[j] = 0
-                        vyk[j] = 0
-                    self.vx[j] += np.sum(vxk)
-                    self.vy[j] += np.sum(vyk)
-
-                    if any(np.isnan(self.vx)):
-                        raise ValueError("nan")
+        jax_update_velocity(self.xs, self.ys, self.vx, self.vy, self.signs, self.D)
     
     def dissipation(self, alpha=0.1):
         for j in range(self.N):
             vx0 = self.vx[j]
             vy0 = self.vy[j]
 
-            self.vx[j] += alpha*vy0*self.signs[j]
-            self.vy[j] -= alpha*vx0*self.signs[j]
+            self.vx.at[j].add(alpha*vy0*self.signs[j])
+            self.vy.at[j].add(alpha*vx0*self.signs[j])
     
     def annihilate(self, a0=a0):
         for j in range(self.N):
@@ -89,20 +77,20 @@ class VortexPoints:
                     for yshift in [-self.D, 0, self.D]:
                         x_jk = self.xs[k] - self.xs[j] + xshift
                         y_jk = self.ys[k] - self.ys[j] + yshift
-                        r_jk = np.sqrt(x_jk**2 + y_jk**2)
+                        r_jk = jnp.sqrt(x_jk**2 + y_jk**2)
                         if r_jk < a0:
-                            self.signs[j] = 0
-                            self.signs[k] = 0
+                            self.signs.at[j].set(0)
+                            self.signs.at[k].set(0)
     
     def inject(self, npairs):
         stepping = self.D/(2*npairs)
-        posy = np.linspace(0, self.D-stepping, npairs) + np.random.randn(npairs)*self.D/100
-        negy = np.linspace(stepping, self.D, npairs) + np.random.randn(npairs)*self.D/100
+        posy = jnp.linspace(0, self.D-stepping, npairs).add(randn(npairs)*self.D/100)
+        negy = jnp.linspace(stepping, self.D, npairs).add(randn(npairs)*self.D/100)
 
-        free = np.sum(self.signs == 0)
+        free = jnp.sum(self.signs == 0)
         if free > 2*npairs:
-            ixfree = np.where(self.signs == 0)[0]
-            self.ys[ixfree[:len(posy)]] = posy
+            ixfree = jnp.where(self.signs == 0)[0]
+            self.ys.at[ixfree[:len(posy)]].set(posy)
             self.ys[ixfree[len(posy):(len(posy) + len(negy))]] = negy
             self.xs[ixfree] = self.D/2
             self.signs[ixfree[:len(posy)]] = 1
@@ -125,19 +113,19 @@ class VortexPoints:
 
     def step(self, dt):
         for j in range(self.N):
-            self.xs[j] += self.vx[j]*dt
-            self.ys[j] += self.vy[j]*dt
+            self.xs.at[j].add(self.vx[j]*dt)
+            self.ys.at[j].add(self.vy[j]*dt)
     
     def coerce(self):
         for j in range(self.N):
             if self.xs[j] > self.D:
-                self.xs[j] -= self.D
+                self.xs.at[j].add(-self.D)
             if self.ys[j] > self.D:
-                self.ys[j] -= self.D
+                self.ys.at[j].add(-self.D)
             if self.xs[j] < 0:
-                self.xs[j] += self.D
+                self.xs.at[j].add(self.D)
             if self.ys[j] < 0:
-                self.ys[j] += self.D
+                self.ys.at[j].add(self.D)
             
    
 if __name__ == '__main__':
@@ -153,11 +141,11 @@ if __name__ == '__main__':
     dt = 0.0001
     last_inject = t
     while True:
-        if t - last_inject > 0.001:
-            vp.inject(3)
-            vp.annihilate()
-            last_inject = t
-            print("injecting")
+        # if t - last_inject > 0.001:
+        #     vp.inject(3)
+        #     vp.annihilate()
+        #     last_inject = t
+        #     print("injecting")
         vp.update_velocity_vector()
         vp.dissipation(0.01)
         vp.step(dt)
