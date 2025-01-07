@@ -1,7 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
-# import jax.numpy as np
 from numpy.random import randn
+
+import taichi as ti
+
+ti.init(ti.gpu)
 
 N = 50
 
