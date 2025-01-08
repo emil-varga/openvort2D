@@ -33,6 +33,27 @@ def update_velocity_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(), signs: ti
                     vx[j] += -kappa/4/3.14159/r_jk**2*y_jk*signs[k]
                     vy[j] += kappa/4/3.14159/r_jk**2*x_jk*signs[k]
 
+@ti.kernel
+def annihilate_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(), 
+                  signs: ti.types.ndarray(), shifts: ti.types.ndarray(),
+                  a0: float):
+    N = xs.shape[0]
+    for j in range(N):
+        if signs[j] == 0:
+            continue
+        for k in range(N):
+            if k == j:
+                continue
+            if signs[j]*signs[k] >= 0:
+                continue
+            for xshift in shifts:
+                for yshift in shifts:
+                    x_jk = xs[k] - xs[j] + xshift
+                    y_jk = ys[k] - ys[j] + yshift
+                    r_jk = ti.sqrt(x_jk**2 + y_jk**2)
+                    if r_jk < a0:
+                        signs[j] = 0
+                        signs[k] = 0
 
 class VortexPoints:
     def __init__(self, N, D=1):
@@ -90,22 +111,8 @@ class VortexPoints:
             self.vy[j] -= alpha*vx0*self.signs[j]
     
     def annihilate(self, a0=a0):
-        for j in range(self.N):
-            if self.signs[j] == 0:
-                continue
-            for k in range(self.N):
-                if k == j:
-                    continue
-                if self.signs[j]*self.signs[k] >= 0:
-                    continue
-                for xshift in [-self.D, 0, self.D]:
-                    for yshift in [-self.D, 0, self.D]:
-                        x_jk = self.xs[k] - self.xs[j] + xshift
-                        y_jk = self.ys[k] - self.ys[j] + yshift
-                        r_jk = np.sqrt(x_jk**2 + y_jk**2)
-                        if r_jk < a0:
-                            self.signs[j] = 0
-                            self.signs[k] = 0
+        shifts = np.array([-self.D, 0, self.D])
+        annihilate_ti(self.xs, self.ys, self.signs, shifts, a0)
     
     def inject(self, npairs):
         stepping = self.D/(2*npairs)
@@ -123,7 +130,7 @@ class VortexPoints:
             return
         
         #otherwise we need to expand the arrays
-        self.xs = np.append(self.xs, np.zeros(len(posy) + len(negy)) + self.D/100)
+        self.xs = np.append(self.xs, np.zeros(len(posy) + len(negy)) + self.D/2)
         self.ys = np.append(self.ys, posy)
         self.ys = np.append(self.ys, negy)
         
@@ -165,9 +172,10 @@ if __name__ == '__main__':
     t = 0
     dt = 0.0001
     last_inject = t
+    frame = 0
     while True:
         if t - last_inject > 0.001:
-            vp.inject(3)
+            vp.inject(10)
             vp.annihilate()
             last_inject = t
             print("injecting")
@@ -183,8 +191,10 @@ if __name__ == '__main__':
         pos.set_ydata(vp.ys[vp.signs > 0])
         neg.set_xdata(vp.xs[vp.signs < 0])
         neg.set_ydata(vp.ys[vp.signs < 0])
-        # plt.pause(0.01)
+        plt.pause(0.01)
         N = abs(vp.signs).sum()
-        print(t2 - t1, t, N, vp.N)
+        print(frame, t2 - t1, t, N, vp.N)
+        fig.savefig(f'output/frame{frame:08d}.png')
         if N == 0:
             break
+        frame += 1
