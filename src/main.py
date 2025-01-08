@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy.random import randn
+import time
 
 import taichi as ti
 
@@ -10,6 +11,28 @@ N = 50
 
 kappa = 9.96e-4
 a0 = 1e-4
+
+
+@ti.kernel
+def update_velocity_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(), signs: ti.types.ndarray(),
+                       vx: ti.types.ndarray(), vy: ti.types.ndarray(), shifts: ti.types.ndarray()):
+    N = xs.shape[0]
+    for j in range(N):
+        if signs[j] == 0:
+            continue
+        vx[j] = 0
+        vy[j] = 0
+        for k in range(N):
+            for xshift in shifts:
+                for yshift in shifts:
+                    if k == j and xshift == 0 and yshift == 0:
+                        continue
+                    x_jk = xs[k] - xs[j] + xshift
+                    y_jk = ys[k] - ys[j] + yshift
+                    r_jk = ti.sqrt(x_jk**2 + y_jk**2)
+                    vx[j] += -kappa/4/3.14159/r_jk**2*y_jk*signs[k]
+                    vy[j] += kappa/4/3.14159/r_jk**2*x_jk*signs[k]
+
 
 class VortexPoints:
     def __init__(self, N, D=1):
@@ -31,22 +54,9 @@ class VortexPoints:
         ax.scatter(self.xs[ixn], self.ys[ixn], color='b')
     
     def update_velocity(self):
-        for j in range(self.N):
-            if self.signs[j] == 0:
-                continue
-            self.vx[j] = 0
-            self.vy[j] = 0
-            for k in range(self.N):
-                for xshift in [-self.D, 0, self.D]:
-                    for yshift in [-self.D, 0, self.D]:
-                        if k == j and xshift == 0 and yshift == 0:
-                            continue
-                        x_jk = self.xs[k] - self.xs[j] + xshift
-                        y_jk = self.ys[k] - self.ys[j] + yshift
-                        r_jk = np.sqrt(x_jk**2 + y_jk**2)
-                        self.vx[j] += -kappa/4/np.pi/r_jk**2*y_jk*self.signs[k]
-                        self.vy[j] += kappa/4/np.pi/r_jk**2*x_jk*self.signs[k]
-    
+        shifts = np.array([-self.D, 0, self.D])
+        update_velocity_ti(self.xs, self.ys, self.signs, self.vx, self.vy, shifts)
+
     def update_velocity_vector(self):
         for j in range(self.N):
             if self.signs[j] == 0:
@@ -161,18 +171,20 @@ if __name__ == '__main__':
             vp.annihilate()
             last_inject = t
             print("injecting")
-        vp.update_velocity_vector()
+        vp.update_velocity()
+        t1 = time.time()
         vp.dissipation(0.01)
         vp.step(dt)
         vp.annihilate()
         vp.coerce()
+        t2 = time.time()
         t += dt
         pos.set_xdata(vp.xs[vp.signs > 0])
         pos.set_ydata(vp.ys[vp.signs > 0])
         neg.set_xdata(vp.xs[vp.signs < 0])
         neg.set_ydata(vp.ys[vp.signs < 0])
-        plt.pause(0.01)
+        # plt.pause(0.01)
         N = abs(vp.signs).sum()
-        print(t, N, vp.N)
+        print(t2 - t1, t, N, vp.N)
         if N == 0:
             break
