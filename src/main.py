@@ -19,43 +19,93 @@ a0 = 1e-4
 def update_velocity_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(), signs: ti.types.ndarray(),
                        vx: ti.types.ndarray(), vy: ti.types.ndarray(), shifts: ti.types.ndarray()):
     N = xs.shape[0]
+    S = shifts.shape[0]
     for j in range(N):
         if signs[j] == 0:
             continue
         vx[j] = 0
         vy[j] = 0
         for k in range(N):
-            for xshift in shifts:
-                for yshift in shifts:
-                    if k == j and xshift == 0 and yshift == 0:
+            for xshift in range(S):
+                for yshift in range(S):
+                    if k == j and shifts[xshift] == 0 and shifts[yshift] == 0:
                         continue
-                    x_jk = xs[j] - xs[k] + xshift
-                    y_jk = ys[j] - ys[k] + yshift
+                    x_jk = xs[j] - xs[k] + shifts[xshift]
+                    y_jk = ys[j] - ys[k] + shifts[yshift]
                     r2_jk = x_jk**2 + y_jk**2
-                    vx[j] += -kappa/4/3.14159/r2_jk*y_jk*signs[k]
-                    vy[j] += kappa/4/3.14159/r2_jk*x_jk*signs[k]
+                    vx[j] += -kappa/2/3.14159/r2_jk*y_jk*signs[k]
+                    vy[j] += kappa/2/3.14159/r2_jk*x_jk*signs[k]
 
 @ti.kernel
 def annihilate_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(), 
-                  signs: ti.types.ndarray(), shifts: ti.types.ndarray(),
-                  a0: float):
+                  signs: ti.types.ndarray(dtype=ti.int64), shifts: ti.types.ndarray(),
+                  a0: float, to_annihilate: ti.types.ndarray()):
     N = xs.shape[0]
+    S = shifts.shape[0]
+
+    for j in range(N):
+        to_annihilate[j] = 0
+
+    # ti.loop_config(serialize=True)
     for j in range(N):
         if signs[j] == 0:
             continue
-        for k in range(N):
-            if k == j:
+        for k in range(j+1, N):
+            if signs[k] == 0 or signs[j] == signs[k]:
                 continue
-            if signs[j]*signs[k] >= 0:
-                continue
-            for xshift in shifts:
-                for yshift in shifts:
-                    x_jk = xs[k] - xs[j] + xshift
-                    y_jk = ys[k] - ys[j] + yshift
+            for xshift in range(S):
+                for yshift in range(S):
+                    x_jk = xs[k] - xs[j] + shifts[xshift]
+                    y_jk = ys[k] - ys[j] + shifts[yshift]
                     r_jk = ti.sqrt(x_jk**2 + y_jk**2)
                     if r_jk < a0:
-                        signs[j] = 0
-                        signs[k] = 0
+                        # print("Add ", j, k)
+                        to_annihilate[j] += 1
+                        to_annihilate[k] += 1
+    
+    OK = True
+    # total = 0
+    # ti.loop_config(serialize=True)
+    for j in range(N):
+        # if to_annihilate[j] > 0:
+        #     total += 1
+        if to_annihilate[j] > 1:
+            # print("NotOK")
+            OK = False
+            # break
+    
+    # print(OK, total)
+    if OK:
+        # s = 0
+        # for j in range(N):
+        #     s += signs[j]
+        # print('before', s)
+        for j in range(N):
+            if to_annihilate[j] > 0:
+                signs[j] = 0
+        # s = 0
+        # for j in range(N):
+        #     s += signs[j]
+        # print('after', s)
+    else:
+        ti.loop_config(serialize=True)
+        for j in range(N):
+            if signs[j] == 0:
+                continue
+            for k in range(N):
+                if k == j:
+                    continue
+                if signs[k] == 0 or signs[j] == signs[k]:
+                    continue
+                for xshift in range(S):
+                    for yshift in range(S):
+                        x_jk = xs[k] - xs[j] + shifts[xshift]
+                        y_jk = ys[k] - ys[j] + shifts[yshift]
+                        r_jk = ti.sqrt(x_jk**2 + y_jk**2)
+                        if r_jk < a0:
+                            signs[j] = 0
+                            signs[k] = 0
+        
 
 class VortexPoints:
     def __init__(self, N, D=1):
@@ -67,7 +117,7 @@ class VortexPoints:
         self.ys += randn(N)*D
         self.vx = np.zeros_like(self.xs)
         self.vy = np.zeros_like(self.ys)
-        self.signs = np.ones(N)
+        self.signs = np.ones(N, dtype=int)
         self.signs[N//2:] = -1
 
     def plot(self, ax):
@@ -90,7 +140,8 @@ class VortexPoints:
     
     def annihilate(self, a0=a0):
         shifts = np.array([-self.D, 0, self.D])
-        annihilate_ti(self.xs, self.ys, self.signs, shifts, a0)
+        to_annihilate = np.zeros(N)
+        annihilate_ti(self.xs, self.ys, self.signs, shifts, a0, to_annihilate)
     
     def inject(self, npairs):
         stepping = self.D/(2*npairs)
@@ -115,11 +166,10 @@ class VortexPoints:
         self.vx = np.append(self.vx, np.zeros(len(posy) + len(negy)))
         self.vy = np.append(self.vy, np.zeros(len(posy) + len(negy)))
 
-        self.signs = np.append(self.signs, np.ones_like(posy))
-        self.signs = np.append(self.signs, -np.ones_like(negy))
+        self.signs = np.append(self.signs, np.ones_like(posy, dtype=int))
+        self.signs = np.append(self.signs, -np.ones_like(negy, dtype=int))
 
         self.N += len(posy) + len(negy)
-
 
     def step(self, dt):
         for j in range(self.N):
@@ -136,7 +186,11 @@ class VortexPoints:
                 self.xs[j] += self.D
             if self.ys[j] < 0:
                 self.ys[j] += self.D
-            
+    
+    def check(self):
+        v = sum(self.signs)
+        if abs(v) > 0:
+            raise RuntimeError("nonzero vorticity")
    
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -169,24 +223,31 @@ if __name__ == '__main__':
     while True:
         if t - last_inject > 0.001:
             vp.inject(10)
+            vp.check()
             vp.annihilate()
+            vp.check()
             last_inject = t
             print("injecting")
         vp.update_velocity()
+        vp.check()
         t1 = time.time()
         vp.dissipation(alpha, alphap)
+        vp.check()
         vp.step(dt)
+        vp.check()
         vp.annihilate()
+        vp.check()
         vp.coerce()
+        vp.check()
         t2 = time.time()
         t += dt
         pos.set_xdata(vp.xs[vp.signs > 0])
         pos.set_ydata(vp.ys[vp.signs > 0])
         neg.set_xdata(vp.xs[vp.signs < 0])
         neg.set_ydata(vp.ys[vp.signs < 0])
-        plt.pause(0.01)
+        plt.pause(0.001)
         N = abs(vp.signs).sum()
-        print(frame, t2 - t1, t, N, vp.N)
+        print(frame, t2 - t1, t, N, vp.N, sum(vp.signs))
         if save:
             fig.savefig(f'{output}/frame{frame:08d}.png')
         if N == 0:
