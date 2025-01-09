@@ -9,8 +9,6 @@ import os
 
 ti.init(ti.gpu)
 
-N = 50
-
 kappa = 9.96e-4
 a0 = 1e-4
 
@@ -39,7 +37,7 @@ def update_velocity_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(), signs: ti
 @ti.kernel
 def annihilate_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(), 
                   signs: ti.types.ndarray(dtype=ti.int64), shifts: ti.types.ndarray(),
-                  a0: float, to_annihilate: ti.types.ndarray()):
+                  a0: float, to_annihilate: ti.types.ndarray()) -> int:
     N = xs.shape[0]
     S = shifts.shape[0]
 
@@ -50,6 +48,7 @@ def annihilate_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(),
     for j in range(N):
         if signs[j] == 0:
             continue
+        move_on = False
         for k in range(j+1, N):
             if signs[k] == 0 or signs[j] == signs[k]:
                 continue
@@ -59,39 +58,30 @@ def annihilate_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(),
                     y_jk = ys[k] - ys[j] + shifts[yshift]
                     r_jk = ti.sqrt(x_jk**2 + y_jk**2)
                     if r_jk < a0:
-                        # print("Add ", j, k)
                         to_annihilate[j] += 1
                         to_annihilate[k] += 1
+                        move_on = True
+                        break
+                if move_on:
+                    break
+            if move_on:
+                break
     
     OK = True
-    # total = 0
-    # ti.loop_config(serialize=True)
     for j in range(N):
-        # if to_annihilate[j] > 0:
-        #     total += 1
         if to_annihilate[j] > 1:
-            # print("NotOK")
             OK = False
-            # break
-    
-    # print(OK, total)
+
     if OK:
-        # s = 0
-        # for j in range(N):
-        #     s += signs[j]
-        # print('before', s)
         for j in range(N):
             if to_annihilate[j] > 0:
                 signs[j] = 0
-        # s = 0
-        # for j in range(N):
-        #     s += signs[j]
-        # print('after', s)
     else:
         ti.loop_config(serialize=True)
         for j in range(N):
             if signs[j] == 0:
                 continue
+            move_on = False
             for k in range(N):
                 if k == j:
                     continue
@@ -105,6 +95,13 @@ def annihilate_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(),
                         if r_jk < a0:
                             signs[j] = 0
                             signs[k] = 0
+                            move_on = True
+                            break
+                    if move_on:
+                        break
+                if move_on:
+                    break
+    return OK
         
 
 class VortexPoints:
@@ -119,6 +116,11 @@ class VortexPoints:
         self.vy = np.zeros_like(self.ys)
         self.signs = np.ones(N, dtype=int)
         self.signs[N//2:] = -1
+        self.shifts = np.array([-D, 0, D])
+        self.to_annihilate = np.zeros(N)
+        self.t = 0
+        self.omega = 0
+        self.A = 0
 
     def plot(self, ax):
         ixp = self.signs > 0
@@ -127,8 +129,7 @@ class VortexPoints:
         ax.scatter(self.xs[ixn], self.ys[ixn], color='b')
     
     def update_velocity(self):
-        shifts = np.array([-self.D, 0, self.D])
-        update_velocity_ti(self.xs, self.ys, self.signs, self.vx, self.vy, shifts)
+        update_velocity_ti(self.xs, self.ys, self.signs, self.vx, self.vy, self.shifts)
     
     def dissipation(self, alpha=0.1, alphap=0):
         for j in range(self.N):
@@ -139,9 +140,7 @@ class VortexPoints:
             self.vy[j] = vy0 - alpha*vx0*self.signs[j] - alphap*vy0
     
     def annihilate(self, a0=a0):
-        shifts = np.array([-self.D, 0, self.D])
-        to_annihilate = np.zeros(N)
-        annihilate_ti(self.xs, self.ys, self.signs, shifts, a0, to_annihilate)
+        annihilate_ti(self.xs, self.ys, self.signs, self.shifts, a0, self.to_annihilate)
     
     def inject(self, npairs):
         stepping = self.D/(2*npairs)
@@ -151,11 +150,11 @@ class VortexPoints:
         free = np.sum(self.signs == 0)
         if free > 2*npairs:
             ixfree = np.where(self.signs == 0)[0]
-            self.ys[ixfree[:len(posy)]] = posy
-            self.ys[ixfree[len(posy):(len(posy) + len(negy))]] = negy
-            self.xs[ixfree] = self.D/2
-            self.signs[ixfree[:len(posy)]] = 1
-            self.signs[ixfree[len(posy):(len(posy) + len(negy))]] = -1
+            self.ys[ixfree[:npairs]] = posy
+            self.ys[ixfree[npairs:(2*npairs)]] = negy
+            self.xs[ixfree[:(2*npairs)]] = self.D/2
+            self.signs[ixfree[:npairs]] = 1
+            self.signs[ixfree[npairs:(2*npairs)]] = -1
             return
         
         #otherwise we need to expand the arrays
@@ -169,12 +168,14 @@ class VortexPoints:
         self.signs = np.append(self.signs, np.ones_like(posy, dtype=int))
         self.signs = np.append(self.signs, -np.ones_like(negy, dtype=int))
 
-        self.N += len(posy) + len(negy)
+        self.N += 2*npairs
+        self.to_annihilate = np.zeros(self.N)
 
     def step(self, dt):
         for j in range(self.N):
             self.xs[j] += self.vx[j]*dt
             self.ys[j] += self.vy[j]*dt
+        self.t += dt
     
     def coerce(self):
         for j in range(self.N):
@@ -209,7 +210,7 @@ if __name__ == '__main__':
 
     os.makedirs(output, exist_ok=True)
 
-    vp = VortexPoints(N, D)
+    vp = VortexPoints(50, D)
     fig, ax = plt.subplots()
     ax.set_xlim(0, D)
     ax.set_ylim(0, D)
@@ -221,25 +222,19 @@ if __name__ == '__main__':
     last_inject = t
     frame = 0
     while True:
-        if t - last_inject > 0.001:
-            vp.inject(10)
-            vp.check()
+        if t - last_inject > 0.0005:
+            vp.inject(5)
             vp.annihilate()
             vp.check()
             last_inject = t
-            print("injecting")
+            # print("injecting")
         vp.update_velocity()
         vp.check()
-        t1 = time.time()
         vp.dissipation(alpha, alphap)
-        vp.check()
         vp.step(dt)
-        vp.check()
         vp.annihilate()
         vp.check()
         vp.coerce()
-        vp.check()
-        t2 = time.time()
         t += dt
         pos.set_xdata(vp.xs[vp.signs > 0])
         pos.set_ydata(vp.ys[vp.signs > 0])
@@ -247,7 +242,7 @@ if __name__ == '__main__':
         neg.set_ydata(vp.ys[vp.signs < 0])
         plt.pause(0.001)
         N = abs(vp.signs).sum()
-        print(frame, t2 - t1, t, N, vp.N, sum(vp.signs))
+        print(frame, t, N, vp.N, sum(vp.signs))
         if save:
             fig.savefig(f'{output}/frame{frame:08d}.png')
         if N == 0:
