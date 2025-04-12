@@ -121,20 +121,12 @@ class VortexPoints:
                 npos = int(0.5*polarization*N)
                 nneg = npos
                 nrest = N - npos - nneg
-                ix_left = self.xs < D/2
-                ix_right = np.logical_not(ix_left)
-                #make nneg on the left negative and npos on the right positive
-                self.signs[np.where(ix_left)[0][:nneg]] = -1
-                self.signs[np.where(ix_right)[0][:npos]] = 1
-                k = 0
-                while True:
-                    mismatch = np.sum(self.signs)
-                    print(f"Mismatch: {mismatch}")
-                    if mismatch*self.signs[k] > 0:
-                        self.signs[k] *= -1
-                    if mismatch == 0:
-                        break
-                    k += 1
+                self.xs[:npos] = (randn(npos) + 1)*D/2
+                self.signs[:npos] = +1
+                self.xs[npos:(npos+nneg)] = randn(nneg)*D/2
+                self.signs[npos:(npos+nneg)] = -1
+                self.signs[(npos+nneg):(npos+nneg+int(nrest/2))] = +1
+                self.signs[(npos+nneg+int(nrest/2)):] = -1
         self.shifts = np.array([-D, 0, D])
         self.to_annihilate = np.zeros(N)
         self.t = 0
