@@ -7,7 +7,7 @@ import argparse
 import taichi as ti
 import os
 
-ti.init(ti.cpu)
+ti.init(ti.gpu)
 
 kappa = 9.96e-4
 

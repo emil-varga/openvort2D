@@ -1,10 +1,7 @@
 import numpy as np
-from numpy.random import randn
+from numpy.random import rand
 
 import taichi as ti
-
-
-ti.init(ti.cpu)
 
 kappa = 9.96e-4
 
@@ -107,8 +104,8 @@ class VortexPoints:
         self.D = D
         self.xs = np.zeros(N)
         self.ys = np.zeros(N)
-        self.xs += randn(N)*D
-        self.ys += randn(N)*D
+        self.xs += rand(N)*D
+        self.ys += rand(N)*D
         self.vx = np.zeros_like(self.xs)
         self.vy = np.zeros_like(self.ys)
         self.signs = np.ones(N, dtype=int)
@@ -121,9 +118,9 @@ class VortexPoints:
                 npos = int(0.5*polarization*N)
                 nneg = npos
                 nrest = N - npos - nneg
-                self.xs[:npos] = (randn(npos) + 1)*D/2
+                self.xs[:npos] = (rand(npos) + 1)*D/2
                 self.signs[:npos] = +1
-                self.xs[npos:(npos+nneg)] = randn(nneg)*D/2
+                self.xs[npos:(npos+nneg)] = rand(nneg)*D/2
                 self.signs[npos:(npos+nneg)] = -1
                 self.signs[(npos+nneg):(npos+nneg+int(nrest/2))] = +1
                 self.signs[(npos+nneg+int(nrest/2)):] = -1
