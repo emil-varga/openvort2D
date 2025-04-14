@@ -7,8 +7,6 @@ import argparse
 import taichi as ti
 import os
 
-ti.init(ti.gpu)
-
 kappa = 9.96e-4
 
 from VortexPoints import VortexPoints
@@ -24,6 +22,7 @@ if __name__ == '__main__':
     parser.add_argument('--save-every', type=int, default=1)
     parser.add_argument('--polarization', type=float, default=0)
     parser.add_argument('--polarization-type', type=str, default='none')
+    parser.add_argument('--gpu', action='store_true')
 
     args = parser.parse_args()
     D = args.D
@@ -31,6 +30,11 @@ if __name__ == '__main__':
     alphap = args.alphap
     output = args.output
     save = args.save
+
+    if args.gpu:
+        ti.init(ti.gpu)
+    else:
+        ti.init(ti.cpu)
 
     os.makedirs(output, exist_ok=True)
 

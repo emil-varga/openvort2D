@@ -3,6 +3,7 @@
 output*
 video*
 *.ipynb
+*.avi
 ### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/
