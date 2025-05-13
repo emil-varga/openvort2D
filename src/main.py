@@ -23,6 +23,8 @@ if __name__ == '__main__':
     parser.add_argument('--polarization', type=float, default=0)
     parser.add_argument('--polarization-type', type=str, default='none')
     parser.add_argument('--gpu', action='store_true')
+    parser.add_argument('--N', type=int, default=1000)
+    parser.add_argument('--dt', type=float, default=1e-9)
 
     args = parser.parse_args()
     D = args.D
@@ -38,7 +40,7 @@ if __name__ == '__main__':
 
     os.makedirs(output, exist_ok=True)
 
-    vp = VortexPoints(10000, D, polarization=args.polarization, polarization_type=args.polarization_type)
+    vp = VortexPoints(args.N, D, polarization=args.polarization, polarization_type=args.polarization_type)
     fig, ax = plt.subplots()
     ax.set_xlim(0, D)
     ax.set_ylim(0, D)
@@ -46,7 +48,7 @@ if __name__ == '__main__':
     pos, = ax.plot(vp.xs[vp.signs > 0], vp.ys[vp.signs > 0], 'o', color='r', ms=2)
     neg, = ax.plot(vp.xs[vp.signs < 0], vp.ys[vp.signs < 0], 'o', color='b', ms=2)
     t = 0
-    dt = 0.000001
+    dt = args.dt
     last_inject = t
     frame = 0
     it = 0

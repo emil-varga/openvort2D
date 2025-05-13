@@ -1,5 +1,6 @@
 import numpy as np
-from numpy.random import rand
+from numpy.random import rand, randn
+import matplotlib.pyplot as plt
 
 import taichi as ti
 
@@ -109,7 +110,7 @@ class VortexPoints:
         self.vx = np.zeros_like(self.xs)
         self.vy = np.zeros_like(self.ys)
         self.signs = np.ones(N, dtype=int)
-        self.signs[N//2:] = -1
+        self.signs[int(N/2):] = -1
         match polarization_type:
             case 'none':
                 pass
@@ -124,6 +125,25 @@ class VortexPoints:
                 self.signs[npos:(npos+nneg)] = -1
                 self.signs[(npos+nneg):(npos+nneg+int(nrest/2))] = +1
                 self.signs[(npos+nneg+int(nrest/2)):] = -1
+            case 'dipole':
+                print("initializing dipole")
+                x0 = D*np.sqrt(2)/3/2
+                n2 = int(N/2)
+                self.xs[:n2] = D/2 - x0 + randn(n2)*D/10
+                self.ys[:n2] = D/2 - x0 + randn(n2)*D/10
+                self.signs[:n2] = 1
+                self.xs[n2:] = D/2 + x0 + randn(n2)*D/10
+                self.ys[n2:] = D/2 + x0 + randn(n2)*D/10
+                self.signs[n2:] = -1
+                fig, ax = plt.subplots()
+                print(D, x0)
+                ax.plot(self.xs[:n2], self.ys[:n2], 'o')
+                ax.plot(self.xs[n2:], self.ys[n2:], 'x')
+                ax.set_aspect('equal')
+                plt.show()
+                self.coerce()
+            case _:
+                raise ValueError("Unknown polarization type.")
         self.shifts = np.array([-D, 0, D])
         self.to_annihilate = np.zeros(N)
         self.t = 0
@@ -186,15 +206,23 @@ class VortexPoints:
         self.t += dt
     
     def coerce(self):
-        for j in range(self.N):
-            if self.xs[j] > self.D:
-                self.xs[j] -= self.D
-            if self.ys[j] > self.D:
-                self.ys[j] -= self.D
-            if self.xs[j] < 0:
-                self.xs[j] += self.D
-            if self.ys[j] < 0:
-                self.ys[j] += self.D
+        while True:
+            coerced = 0
+            for j in range(self.N):
+                if self.xs[j] > self.D:
+                    self.xs[j] -= self.D
+                    coerced += 1
+                if self.ys[j] > self.D:
+                    self.ys[j] -= self.D
+                    coerced += 1
+                if self.xs[j] < 0:
+                    self.xs[j] += self.D
+                    coerced += 1
+                if self.ys[j] < 0:
+                    self.ys[j] += self.D
+                    coerced += 1
+            if coerced == 0:
+                break
     
     def check(self):
         v = sum(self.signs)
