@@ -1,6 +1,5 @@
 import numpy as np
 from numpy.random import rand, randn
-import matplotlib.pyplot as plt
 
 import taichi as ti
 
@@ -27,6 +26,35 @@ def update_velocity_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(), signs: ti
                     r2_jk = x_jk**2 + y_jk**2
                     vx[j] += -kappa/2/3.14159/r2_jk*y_jk*signs[k]
                     vy[j] += kappa/2/3.14159/r2_jk*x_jk*signs[k]
+
+@ti.kernel
+def update_velocity_walls_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(), signs: ti.types.ndarray(),
+                             vx: ti.types.ndarray(), vy: ti.types.ndarray(), shifts: ti.types.ndarray()):
+    N = xs.shape[0]
+    S = shifts.shape[0]
+    for j in range(N):
+        if signs[j] == 0:
+            continue
+        vx[j] = 0
+        vy[j] = 0
+        for k in range(N):
+            for xshift in range(S):
+                for yshift in range(S):
+                    if k == j and shifts[xshift] == 0 and shifts[yshift] == 0:
+                        continue
+                    x_jk = xs[j] - xs[k] + shifts[xshift]
+                    if yshift == 0:
+                        y_jk = ys[j] - ys[k]
+                        mirror_flip = 1
+                    elif yshift > 0:
+                        mirror_flip = -1
+                        y_jk = ys[j] - (2*yshift - ys[k])
+                    else: 
+                        y_jk = ys[j] + ys[k]
+
+                    r2_jk = x_jk**2 + y_jk**2
+                    vx[j] += -kappa/2/3.14159/r2_jk*y_jk*signs[k]*mirror_flip
+                    vy[j] += kappa/2/3.14159/r2_jk*x_jk*signs[k]*mirror_flip
 
 @ti.kernel
 def annihilate_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(), 
@@ -99,7 +127,8 @@ def annihilate_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(),
         
 
 class VortexPoints:
-    def __init__(self, N, D=1, a0=1e-5, polarization=0, polarization_type='none'):
+    def __init__(self, N, D=1, a0=1e-5, polarization=0, polarization_type='none', walls=False):
+        self.walls = walls
         self.a0 = a0 # annihilation distance, in cm
         self.N = N
         self.D = D
@@ -135,12 +164,6 @@ class VortexPoints:
                 self.xs[n2:] = D/2 + x0 + randn(n2)*D/10
                 self.ys[n2:] = D/2 + x0 + randn(n2)*D/10
                 self.signs[n2:] = -1
-                fig, ax = plt.subplots()
-                print(D, x0)
-                ax.plot(self.xs[:n2], self.ys[:n2], 'o')
-                ax.plot(self.xs[n2:], self.ys[n2:], 'x')
-                ax.set_aspect('equal')
-                plt.show()
                 self.coerce()
             case _:
                 raise ValueError("Unknown polarization type.")
