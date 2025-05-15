@@ -25,6 +25,7 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', action='store_true')
     parser.add_argument('--N', type=int, default=1000)
     parser.add_argument('--dt', type=float, default=1e-9)
+    parser.add_argument('--restart')
 
     args = parser.parse_args()
     D = args.D
@@ -40,7 +41,8 @@ if __name__ == '__main__':
 
     os.makedirs(output, exist_ok=True)
 
-    vp = VortexPoints(args.N, D, polarization=args.polarization, polarization_type=args.polarization_type)
+    vp = VortexPoints(args.N, D, polarization=args.polarization, polarization_type=args.polarization_type,
+                      restart=args.restart)
     fig, ax = plt.subplots()
     ax.set_xlim(0, D)
     ax.set_ylim(0, D)
