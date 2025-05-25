@@ -127,7 +127,9 @@ def annihilate_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(),
         
 
 class VortexPoints:
-    def __init__(self, N, D=1, a0=1e-5, polarization=0, polarization_type='none', walls=False):
+    def __init__(self, N:int|None=None, D:float=1, a0:float=1e-5,
+                 polarization:float=0, polarization_type:str='none',
+                 walls:bool=False):
         self.walls = walls
         self.a0 = a0 # annihilation distance, in cm
         self.N = N
