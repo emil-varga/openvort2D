@@ -29,32 +29,37 @@ def update_velocity_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(), signs: ti
 
 @ti.kernel
 def update_velocity_walls_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(), signs: ti.types.ndarray(),
-                             vx: ti.types.ndarray(), vy: ti.types.ndarray(), shifts: ti.types.ndarray()):
+                             vx: ti.types.ndarray(), vy: ti.types.ndarray(), D: ti.types.float64):
     N = xs.shape[0]
-    S = shifts.shape[0]
     for j in range(N):
         if signs[j] == 0:
             continue
         vx[j] = 0
         vy[j] = 0
         for k in range(N):
-            for xshift in range(S):
-                for yshift in range(S):
-                    if k == j and shifts[xshift] == 0 and shifts[yshift] == 0:
-                        continue
-                    x_jk = xs[j] - xs[k] + shifts[xshift]
-                    if yshift == 0:
-                        y_jk = ys[j] - ys[k]
-                        mirror_flip = 1
-                    elif yshift > 0:
-                        mirror_flip = -1
-                        y_jk = ys[j] - (2*yshift - ys[k])
-                    else: 
-                        y_jk = ys[j] + ys[k]
+            for xshift in range(-1, 2):
+                x_jk = xs[j] - xs[k] + xshift*D
 
+                # no shift
+                if k!=j or xshift!=0:
+                    y_jk = ys[j] - ys[k]
                     r2_jk = x_jk**2 + y_jk**2
-                    vx[j] += -kappa/2/3.14159/r2_jk*y_jk*signs[k]*mirror_flip
-                    vy[j] += kappa/2/3.14159/r2_jk*x_jk*signs[k]*mirror_flip
+                    vx[j] += -kappa/2/3.14159/r2_jk*y_jk*signs[k]
+                    vy[j] += kappa/2/3.14159/r2_jk*x_jk*signs[k]
+
+                #shift up
+                mirror_flip = -1
+                y_jk = ys[j] - (2*D - ys[k])
+                r2_jk = x_jk**2 + y_jk**2
+                vx[j] += -kappa/2/3.14159/r2_jk*y_jk*signs[k]*mirror_flip
+                vy[j] += kappa/2/3.14159/r2_jk*x_jk*signs[k]*mirror_flip
+                
+                #shift down
+                mirror_flip = -1
+                y_jk = ys[j] + ys[k]
+                r2_jk = x_jk**2 + y_jk**2
+                vx[j] += -kappa/2/3.14159/r2_jk*y_jk*signs[k]*mirror_flip
+                vy[j] += kappa/2/3.14159/r2_jk*x_jk*signs[k]*mirror_flip
 
 @ti.kernel
 def annihilate_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(), 
@@ -124,6 +129,75 @@ def annihilate_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(),
                 if move_on:
                     break
     return OK
+
+@ti.kernel
+def annihilate_walls_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(), 
+                        signs: ti.types.ndarray(dtype=ti.int64), shifts: ti.types.ndarray(),
+                        a0: float, to_annihilate: ti.types.ndarray()) -> int:
+    N = xs.shape[0]
+    S = shifts.shape[0]
+
+    for j in range(N):
+        to_annihilate[j] = 0
+
+    for j in range(N):
+        if signs[j] == 0:
+            continue
+        move_on = False
+        for k in range(j+1, N):
+            if signs[k] == 0 or signs[j] == signs[k]:
+                continue
+            for xshift in range(S):
+                x_jk = xs[k] - xs[j] + shifts[xshift]
+                y_jk = ys[k] - ys[j]
+                r_jk = ti.sqrt(x_jk**2 + y_jk**2)
+                if r_jk < a0:
+                    to_annihilate[j] += 1
+                    to_annihilate[k] += 1
+                    move_on = True
+                    break
+            if move_on:
+                break
+    
+    OK = True
+    for j in range(N):
+        if to_annihilate[j] > 1:
+            OK = False
+
+    if OK:
+        for j in range(N):
+            if to_annihilate[j] > 0:
+                signs[j] = 0
+    else:
+        ti.loop_config(serialize=True)
+        for j in range(N):
+            if signs[j] == 0:
+                continue
+            move_on = False
+            for k in range(N):
+                if k == j:
+                    continue
+                if signs[k] == 0 or signs[j] == signs[k]:
+                    continue
+                for xshift in range(S):
+                    x_jk = xs[k] - xs[j] + shifts[xshift]
+                    y_jk = ys[k] - ys[j]
+                    r_jk = ti.sqrt(x_jk**2 + y_jk**2)
+                    if r_jk < a0:
+                        signs[j] = 0
+                        signs[k] = 0
+                        move_on = True
+                        break
+                if move_on:
+                    break
+    
+    #now annihilate on walls
+    for k in range(N):
+        if signs[k] == 0:
+            continue
+        if ys[k] < a0 or shifts[2] - ys[k] < a0:
+            signs[k] = 0
+    return OK
         
 
 class VortexPoints:
@@ -182,7 +256,10 @@ class VortexPoints:
         ax.scatter(self.xs[ixn], self.ys[ixn], color='b')
     
     def update_velocity(self):
-        update_velocity_ti(self.xs, self.ys, self.signs, self.vx, self.vy, self.shifts)
+        if self.walls:
+            update_velocity_walls_ti(self.xs, self.ys, self.signs, self.vx, self.vy, self.D)
+        else:
+            update_velocity_ti(self.xs, self.ys, self.signs, self.vx, self.vy, self.shifts)
     
     def dissipation(self, alpha=0.1, alphap=0):
         for j in range(self.N):
@@ -193,7 +270,10 @@ class VortexPoints:
             self.vy[j] = vy0 - alpha*vx0*self.signs[j] - alphap*vy0
     
     def annihilate(self):
-        annihilate_ti(self.xs, self.ys, self.signs, self.shifts, self.a0, self.to_annihilate)
+        if self.walls:
+            annihilate_walls_ti(self.xs, self.ys, self.signs, self.shifts, self.a0, self.to_annihilate)
+        else:
+            annihilate_ti(self.xs, self.ys, self.signs, self.shifts, self.a0, self.to_annihilate)
     
     def inject(self, npairs):
         stepping = self.D/(2*npairs)
@@ -250,6 +330,7 @@ class VortexPoints:
                 break
     
     def check(self):
-        v = sum(self.signs)
-        if abs(v) > 0:
-            raise RuntimeError("nonzero vorticity")
+        if not self.walls:
+            v = sum(self.signs)
+            if abs(v) > 0:
+                raise RuntimeError("nonzero vorticity")
