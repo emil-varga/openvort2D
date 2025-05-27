@@ -203,7 +203,8 @@ def annihilate_walls_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(),
 class VortexPoints:
     def __init__(self, N:int|None=None, D:float=1, a0:float=1e-5,
                  polarization:float=0, polarization_type:str='none',
-                 walls:bool=False, vpin:float=0):
+                 walls:bool=False, vpin:float=0,
+                 probe_v:float=0, probe_v_freq:float=0):
         self.walls = walls
         self.a0 = a0 # annihilation distance, in cm
         self.N = N
@@ -217,6 +218,8 @@ class VortexPoints:
         self.signs = np.ones(N, dtype=int)
         self.signs[int(N/2):] = -1
         self.vpin = vpin
+        self.probe_v = probe_v
+        self.probe_v_freq = probe_v_freq
         match polarization_type:
             case 'none':
                 pass
@@ -261,6 +264,9 @@ class VortexPoints:
             update_velocity_walls_ti(self.xs, self.ys, self.signs, self.vx, self.vy, self.D)
         else:
             update_velocity_ti(self.xs, self.ys, self.signs, self.vx, self.vy, self.shifts)
+        
+        probe_vx = self.probe_v*np.cos(2*np.pi*self.probe_v_freq*self.t)
+        self.vx += probe_vx
     
     def dissipation(self, alpha=0.1, alphap=0):
         self.vx = self.vx + alpha*self.vy*self.signs - alphap*self.vx
