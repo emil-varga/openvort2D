@@ -30,6 +30,7 @@ if __name__ == '__main__':
     parser.add_argument('--dt', type=float, default=1e-9)
     parser.add_argument('--restart', action='store_true')
     parser.add_argument('--walls', action='store_true')
+    parser.add_argument('--pinning-v', type=float, default=0)
 
     args = parser.parse_args()
     D = args.D
@@ -54,7 +55,8 @@ if __name__ == '__main__':
         Lfile_mode = 'a'
         frame = len(vp_files)
     else:
-        vp = VortexPoints(args.N, D, polarization=args.polarization, polarization_type=args.polarization_type, walls=args.walls)
+        vp = VortexPoints(args.N, D, polarization=args.polarization, polarization_type=args.polarization_type,
+                          walls=args.walls, vpin=args.pinning_v)
         Lfile_mode='w'
         frame = 0
     fig, ax = plt.subplots()

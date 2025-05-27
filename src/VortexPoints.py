@@ -203,7 +203,7 @@ def annihilate_walls_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(),
 class VortexPoints:
     def __init__(self, N:int|None=None, D:float=1, a0:float=1e-5,
                  polarization:float=0, polarization_type:str='none',
-                 walls:bool=False):
+                 walls:bool=False, vpin:float=0):
         self.walls = walls
         self.a0 = a0 # annihilation distance, in cm
         self.N = N
@@ -216,6 +216,7 @@ class VortexPoints:
         self.vy = np.zeros_like(self.ys)
         self.signs = np.ones(N, dtype=int)
         self.signs[int(N/2):] = -1
+        self.vpin = vpin
         match polarization_type:
             case 'none':
                 pass
@@ -301,8 +302,10 @@ class VortexPoints:
         self.to_annihilate = np.zeros(self.N)
 
     def step(self, dt):
-        self.xs += self.vx*dt
-        self.ys += self.vy*dt
+        v2 = self.vx**2 + self.vy**2
+        depinned = v2 > self.vpin**2
+        self.xs[depinned] += self.vx[depinned]*dt
+        self.ys[depinned] += self.vy[depinned]*dt
         self.t += dt
     
     def coerce(self):
