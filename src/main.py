@@ -33,6 +33,7 @@ if __name__ == '__main__':
     parser.add_argument('--pinning-v', type=float, default=0)
     parser.add_argument('--probe-v', type=float, default=0)
     parser.add_argument('--probe-v-freq', type=float, default=0)
+    parser.add_argument('--no-plot', action='store_true')
     args = parser.parse_args()
     D = args.D
     alpha = args.alpha
@@ -89,7 +90,8 @@ if __name__ == '__main__':
             pos.set_ydata(vp.ys[vp.signs > 0])
             neg.set_xdata(vp.xs[vp.signs < 0])
             neg.set_ydata(vp.ys[vp.signs < 0])
-            plt.pause(0.001)
+            if not args.no_plot:
+                plt.pause(0.001)
             N = abs(vp.signs).sum()
             print(it, vp.t, N, vp.N, sum(vp.signs))
             Lfile.write(f"{it}\t{vp.t}\t{N}\n")
