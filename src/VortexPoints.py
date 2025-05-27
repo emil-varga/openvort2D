@@ -262,12 +262,8 @@ class VortexPoints:
             update_velocity_ti(self.xs, self.ys, self.signs, self.vx, self.vy, self.shifts)
     
     def dissipation(self, alpha=0.1, alphap=0):
-        for j in range(self.N):
-            vx0 = self.vx[j]
-            vy0 = self.vy[j]
-
-            self.vx[j] = vx0 + alpha*vy0*self.signs[j] - alphap*vx0
-            self.vy[j] = vy0 - alpha*vx0*self.signs[j] - alphap*vy0
+        self.vx = self.vx + alpha*self.vy*self.signs - alphap*self.vx
+        self.vy = self.vy - alpha*self.vx*self.signs - alphap*self.vy
     
     def annihilate(self):
         if self.walls:
@@ -305,9 +301,8 @@ class VortexPoints:
         self.to_annihilate = np.zeros(self.N)
 
     def step(self, dt):
-        for j in range(self.N):
-            self.xs[j] += self.vx[j]*dt
-            self.ys[j] += self.vy[j]*dt
+        self.xs += self.vx*dt
+        self.ys += self.vy*dt
         self.t += dt
     
     def coerce(self):
