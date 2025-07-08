@@ -110,9 +110,9 @@ if __name__ == '__main__':
                 plt.pause(0.001)
             N = abs(vp.signs).sum()
             print(it, vp.t, N, vp.N, sum(vp.signs))
-            Lfile.write(f"{it}\t{vp.t}\t{N}\n")
-            Lfile.flush()
             if it%args.save_every == 0 and save:
+                Lfile.write(f"{it}\t{vp.t}\t{N}\n")
+                Lfile.flush()
                 fig.savefig(f'{output}/frame{frame:08d}.png')
                 frame += 1
                 np.savez(f'{output}/vp_{frame:08d}.npz', vp)
