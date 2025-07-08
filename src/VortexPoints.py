@@ -204,7 +204,8 @@ class VortexPoints:
     def __init__(self, N:int|None=None, D:float=1, a0:float=1e-5,
                  polarization:float=0, polarization_type:str='none',
                  walls:bool=False, vpin:float=0,
-                 probe_v:float=0, probe_v_freq:float=0):
+                 probe_v:float=0, probe_v_freq:float=0,
+                 gridx=None, gridy=None, grid_div=None):
         self.walls = walls
         self.a0 = a0 # annihilation distance, in cm
         self.N = N
@@ -253,6 +254,22 @@ class VortexPoints:
                 self.signs[N_dipole:int(N_dipole + N_random/2)] = +1
                 self.signs[int(N_dipole + N_random/2):] = -1
 
+                self.coerce()
+            case 'grid':
+                n_bunch = int(N/gridx/gridy)
+                sigma_x = D/gridx
+                sigma_y = D/gridy
+                n = 0
+                for j in range(gridx):
+                    sign = 1 - 2*(j % 2)
+                    for k in range(gridy):
+                        cx = j*sigma_x
+                        cy = k*sigma_y
+                        self.xs[n:(n+n_bunch)] = cx + randn(n_bunch)*sigma_x/grid_div
+                        self.ys[n:(n+n_bunch)] = cy + randn(n_bunch)*sigma_y/grid_div
+                        self.signs[n:(n+n_bunch)] = sign
+                        sign *= -1
+                        n += n_bunch
                 self.coerce()
             case _:
                 raise ValueError("Unknown polarization type.")

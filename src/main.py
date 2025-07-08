@@ -28,6 +28,9 @@ if __name__ == '__main__':
     parser.add_argument('--save-every', type=int, default=1)
     parser.add_argument('--polarization', type=float, default=0)
     parser.add_argument('--polarization-type', type=str, default='none')
+    parser.add_argument('--gridx', type=int)
+    parser.add_argument('--gridy', type=int)
+    parser.add_argument('--grid-sigma-div', type=float)
     parser.add_argument('--gpu', action='store_true')
     parser.add_argument('--N', type=int, default=1000)
     parser.add_argument('--dt', type=float, default=1e-9)
@@ -71,7 +74,8 @@ if __name__ == '__main__':
     else:
         vp = VortexPoints(args.N, D, polarization=args.polarization, polarization_type=args.polarization_type,
                           walls=args.walls, vpin=args.pinning_v,
-                          probe_v=args.probe_v, probe_v_freq=args.probe_v_freq)
+                          probe_v=args.probe_v, probe_v_freq=args.probe_v_freq,
+                          gridx=args.gridx, gridy=args.gridy, grid_div=args.grid_sigma_div)
         Lfile_mode='w'
         frame = 0
     fig, ax = plt.subplots()
