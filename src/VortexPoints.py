@@ -236,14 +236,23 @@ class VortexPoints:
                 self.signs[(npos+nneg+int(nrest/2)):] = -1
             case 'dipole':
                 print("initializing dipole")
+                N_random = int(N*(1 - polarization))
+                N_dipole = int(N*polarization)
+
+                #the polarized part
                 x0 = D*np.sqrt(2)/3/2
-                n2 = int(N/2)
+                n2 = int(N_dipole/2)
                 self.xs[:n2] = D/2 - x0 + randn(n2)*D/10
                 self.ys[:n2] = D/2 - x0 + randn(n2)*D/10
                 self.signs[:n2] = 1
-                self.xs[n2:] = D/2 + x0 + randn(n2)*D/10
-                self.ys[n2:] = D/2 + x0 + randn(n2)*D/10
-                self.signs[n2:] = -1
+                self.xs[n2:N_dipole] = D/2 + x0 + randn(n2)*D/10
+                self.ys[n2:N_dipole] = D/2 + x0 + randn(n2)*D/10
+                self.signs[n2:N_dipole] = -1
+
+                #the random part, positions are already random
+                self.signs[N_dipole:int(N_dipole + N_random/2)] = +1
+                self.signs[int(N_dipole + N_random/2):] = -1
+
                 self.coerce()
             case _:
                 raise ValueError("Unknown polarization type.")

@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 import numpy as np
+import matplotlib
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 from numpy.random import randn
 import time
@@ -46,8 +48,17 @@ if __name__ == '__main__':
         ti.init(ti.gpu)
     else:
         ti.init(ti.cpu)
+    
+    base_output = output
+    suffix_k = 1 
+    if os.path.exists(output):
+        while True:
+            output = base_output + f"_{suffix_k}"
+            if not os.path.exists(output):
+                break
+            suffix_k += 1
 
-    os.makedirs(output, exist_ok=True)
+    os.makedirs(output)
 
     if args.restart:
         vp_files = glob(path.join(output, '*.npz'))
