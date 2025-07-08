@@ -260,17 +260,17 @@ class VortexPoints:
                 sigma_x = D/gridx
                 sigma_y = D/gridy
                 n = 0
-                for j in range(gridx):
+                for j in range(gridy):
                     sign = 1 - 2*(j % 2)
-                    for k in range(gridy):
-                        cx = j*sigma_x
-                        cy = k*sigma_y
+                    for k in range(gridx):
+                        cy = (j + 0.5*(gridy+1)%2)*sigma_y
+                        cx = (k + 0.5*(gridx+1)%2)*sigma_x
                         self.xs[n:(n+n_bunch)] = cx + randn(n_bunch)*sigma_x/grid_div
                         self.ys[n:(n+n_bunch)] = cy + randn(n_bunch)*sigma_y/grid_div
                         self.signs[n:(n+n_bunch)] = sign
                         sign *= -1
                         n += n_bunch
-                self.coerce()
+                self.trim()
             case _:
                 raise ValueError("Unknown polarization type.")
         self.shifts = np.array([-D, 0, D])
@@ -358,6 +358,13 @@ class VortexPoints:
                     coerced += 1
             if coerced == 0:
                 break
+    
+    def trim(self):
+        for j in range(self.N):
+            if self.xs[j] > self.D or self.xs[j] < 0:
+                self.signs[j] = 0
+            if self.ys[j] > self.D or self.ys[j] < 0:
+                self.signs[j] = 0
     
     def check(self):
         if not self.walls:
