@@ -261,10 +261,10 @@ class VortexPoints:
                 sigma_y = D/gridy
                 n = 0
                 for j in range(gridy):
-                    sign = 1 - 2*(j % 2)
+                    sign = 1 - 2*int(j % 2)
                     for k in range(gridx):
-                        cy = (j + 0.5*(gridy+1)%2)*sigma_y
-                        cx = (k + 0.5*(gridx+1)%2)*sigma_x
+                        cy = (j + 0.5*int((gridy+1)%2))*sigma_y
+                        cx = (k + 0.5*int((gridx+1)%2))*sigma_x
                         self.xs[n:(n+n_bunch)] = cx + randn(n_bunch)*sigma_x/grid_div
                         self.ys[n:(n+n_bunch)] = cy + randn(n_bunch)*sigma_y/grid_div
                         self.signs[n:(n+n_bunch)] = sign
