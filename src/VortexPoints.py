@@ -296,8 +296,10 @@ class VortexPoints:
         self.vx += probe_vx
     
     def dissipation(self, alpha=0.1, alphap=0):
-        self.vx = self.vx + alpha*self.vy*self.signs - alphap*self.vx
-        self.vy = self.vy - alpha*self.vx*self.signs - alphap*self.vy
+        mf_vx = self.vx + alpha*self.vy*self.signs - alphap*self.vx
+        mf_vy = self.vy - alpha*self.vx*self.signs - alphap*self.vy
+        self.vx = mf_vx
+        self.vy = mf_vy
     
     def annihilate(self):
         if self.walls:

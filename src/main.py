@@ -124,8 +124,8 @@ if __name__ == '__main__':
                 fig.savefig(f'{output}/frame{frame:08d}.png')
                 frame += 1
                 np.savez(f'{output}/vp_{frame:08d}.npz', vp)
-                save_rate = int(save_rate*(1 + args.variable_save_rate))
-                save_countdown = save_rate
+                save_rate = save_rate*(1 + args.variable_save_rate)
+                save_countdown = int(save_rate)
             if N == 0:
                 break
             it += 1
