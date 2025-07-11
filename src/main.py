@@ -40,6 +40,12 @@ if __name__ == '__main__':
     parser.add_argument('--probe-v', type=float, default=0)
     parser.add_argument('--probe-v-freq', type=float, default=0)
     parser.add_argument('--no-plot', action='store_true')
+    parser.add_argument('--pin-type', type=str, default='threshold', 
+                        help="Available are 'threshold' (default) where the vortex moves freely if its velocity is" \
+                        "higher than depin or not at all or 'drag', where vortex velocity is offset by the pinning" \
+                        "velocity.")
+    parser.add_argument('--variable-save-rate', type=float, default=0,
+                        help="Extend the time between saved frames as t_{i+1} = t_{i}*(1 + vsr)")
     args = parser.parse_args()
     D = args.D
     alpha = args.alpha
@@ -87,6 +93,8 @@ if __name__ == '__main__':
     dt = args.dt
     last_inject = 0
     it = 0
+    save_rate = args.save_every
+    save_countdown = 0
     with open(f'{output}/L_t.txt', Lfile_mode) as Lfile:
         while True:
             if args.inject and vp.t - last_inject > 0.0005:
@@ -110,12 +118,15 @@ if __name__ == '__main__':
                 plt.pause(0.001)
             N = abs(vp.signs).sum()
             print(it, vp.t, N, vp.N, sum(vp.signs))
-            if it%args.save_every == 0 and save:
+            if save_countdown == 0 and save:
                 Lfile.write(f"{it}\t{vp.t}\t{N}\n")
                 Lfile.flush()
                 fig.savefig(f'{output}/frame{frame:08d}.png')
                 frame += 1
                 np.savez(f'{output}/vp_{frame:08d}.npz', vp)
+                save_rate = int(save_rate*(1 + args.variable_save_rate))
+                save_countdown = save_rate
             if N == 0:
                 break
             it += 1
+            save_countdown -= 1

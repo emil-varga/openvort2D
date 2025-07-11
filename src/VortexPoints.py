@@ -203,7 +203,7 @@ def annihilate_walls_ti(xs: ti.types.ndarray(), ys: ti.types.ndarray(),
 class VortexPoints:
     def __init__(self, N:int|None=None, D:float=1, a0:float=1e-5,
                  polarization:float=0, polarization_type:str='none',
-                 walls:bool=False, vpin:float=0,
+                 walls:bool=False, vpin:float=0, pin_type='threshold',
                  probe_v:float=0, probe_v_freq:float=0,
                  gridx=None, gridy=None, grid_div=None):
         self.walls = walls
@@ -221,6 +221,7 @@ class VortexPoints:
         self.vpin = vpin
         self.probe_v = probe_v
         self.probe_v_freq = probe_v_freq
+        self.pin_type = pin_type
         match polarization_type:
             case 'none':
                 pass
@@ -336,8 +337,16 @@ class VortexPoints:
     def step(self, dt):
         v2 = self.vx**2 + self.vy**2
         depinned = v2 > self.vpin**2
-        self.xs[depinned] += self.vx[depinned]*dt
-        self.ys[depinned] += self.vy[depinned]*dt
+        if self.pin_type == 'threshold':
+            self.xs[depinned] += self.vx[depinned]*dt
+            self.ys[depinned] += self.vy[depinned]*dt
+        elif self.pin_type == 'drag':
+            v = np.sqrt(v2)
+            v_depinned = v - self.vpin
+            self.xs[depinned] += self.vx[depinned]/v[depinned]*v_depinned[depinned]*dt
+            self.ys[depinned] += self.vy[depinned]/v[depinned]*v_depinned[depinned]*dt
+        else:
+            raise ValueError(f"Unknown pin type, {self.pin_type}.")
         self.t += dt
     
     def coerce(self):
