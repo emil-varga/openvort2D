@@ -296,8 +296,25 @@ class VortexPoints:
         self.vx += probe_vx
     
     def dissipation(self, alpha=0.1, alphap=0):
-        mf_vx = self.vx + alpha*self.vy*self.signs - alphap*self.vx
-        mf_vy = self.vy - alpha*self.vx*self.signs - alphap*self.vy
+        v2 = self.vx**2 + self.vy**2
+        inv_beta2 = v2/self.vpin**2
+        depinned = inv_beta2 > 1
+        # x = 1/Gamma
+        x = np.where(depinned, np.sqrt(inv_beta2 - 1), 0)
+        alpha_hat = x*(alpha**2 + alpha*x + alphap**2 - 2*alphap + 1)/(alpha**2 + 2*alpha*x + alphap**2 - 2*alphap + x**2 + 1)
+        alphap_hat = (alpha**2 + 2*alpha*x + alphap**2 + alphap*x**2 - 2*alphap + 1)/(alpha**2 + 2*alpha*x + alphap**2 - 2*alphap + x**2 + 1)
+        if self.pin_type == 'threshold':
+            mf_vx = np.where(depinned, self.vx + alpha*self.vy*self.signs - alphap*self.vx, 0)
+            mf_vy = np.where(depinned, self.vy - alpha*self.vx*self.signs - alphap*self.vy, 0)
+        elif self.pin_type == 'drag':
+            mf_vx = np.where(depinned, self.vx + alpha_hat*self.vy*self.signs - alphap_hat*self.vx, 0)
+            mf_vy = np.where(depinned, self.vy - alpha_hat*self.vx*self.signs - alphap_hat*self.vy, 0)
+        elif self.pin_type == 'none':
+            mf_vx = self.vx + alpha*self.vy*self.signs - alphap*self.vx
+            mf_vy = self.vy - alpha*self.vx*self.signs - alphap*self.vy
+        else:
+            raise ValueError(f"Unknown pin type, {self.pin_type}.")
+
         self.vx = mf_vx
         self.vy = mf_vy
     
@@ -337,18 +354,8 @@ class VortexPoints:
         self.to_annihilate = np.zeros(self.N)
 
     def step(self, dt):
-        v2 = self.vx**2 + self.vy**2
-        depinned = v2 > self.vpin**2
-        if self.pin_type == 'threshold':
-            self.xs[depinned] += self.vx[depinned]*dt
-            self.ys[depinned] += self.vy[depinned]*dt
-        elif self.pin_type == 'drag':
-            v = np.sqrt(v2)
-            v_depinned = v - self.vpin
-            self.xs[depinned] += self.vx[depinned]/v[depinned]*v_depinned[depinned]*dt
-            self.ys[depinned] += self.vy[depinned]/v[depinned]*v_depinned[depinned]*dt
-        else:
-            raise ValueError(f"Unknown pin type, {self.pin_type}.")
+        self.xs += self.vx*dt
+        self.ys += self.vy*dt
         self.t += dt
     
     def coerce(self):
