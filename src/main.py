@@ -39,6 +39,10 @@ if __name__ == '__main__':
     parser.add_argument('--pinning-v', type=float, default=0)
     parser.add_argument('--probe-v', type=float, default=0)
     parser.add_argument('--probe-v-freq', type=float, default=0)
+    parser.add_argument('--probe-grid', type=int, nargs=2, default=[0,0])
+    parser.add_argument('--probe-grid-v', type=float, default=0)
+    parser.add_argument('--probe-type', type=str, default='uniform', 
+                        help="Probe flow type. Options are 'uniform' (default), 'grid' and 'combined'.")
     parser.add_argument('--no-plot', action='store_true')
     parser.add_argument('--pin-type', type=str, default='threshold', 
                         help="Available are 'threshold' (default) where the vortex moves freely if its velocity is" \
@@ -81,7 +85,8 @@ if __name__ == '__main__':
         vp = VortexPoints(args.N, D, polarization=args.polarization, polarization_type=args.polarization_type,
                           walls=args.walls, vpin=args.pinning_v,
                           probe_v=args.probe_v, probe_v_freq=args.probe_v_freq,
-                          gridx=args.gridx, gridy=args.gridy, grid_div=args.grid_sigma_div)
+                          gridx=args.gridx, gridy=args.gridy, grid_div=args.grid_sigma_div,
+                          probe_type=args.probe_type, probe_grid=args.probe_grid, probe_grid_v=args.probe_grid_v)
         Lfile_mode='w'
         frame = 0
     fig, ax = plt.subplots()

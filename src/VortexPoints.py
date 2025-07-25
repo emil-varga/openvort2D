@@ -240,7 +240,8 @@ class VortexPoints:
     def __init__(self, N:int|None=None, D:float=1, a0:float=1e-5,
                  polarization:float=0, polarization_type:str='none',
                  walls:bool=False, vpin:float=0, pin_type='threshold',
-                 probe_v:float=0, probe_v_freq:float=0,
+                 probe_type:str = 'uniform', probe_v:float=0, probe_v_freq:float=0,
+                 probe_grid=None, probe_grid_v=0,
                  gridx=None, gridy=None, grid_div=None):
         self.walls = walls
         self.a0 = a0 # annihilation distance, in cm
@@ -255,9 +256,24 @@ class VortexPoints:
         self.signs = np.ones(N, dtype=int)
         self.signs[int(N/2):] = -1
         self.vpin = vpin
+        self.pin_type = pin_type
+
+        self.probe_type = probe_type
         self.probe_v = probe_v
         self.probe_v_freq = probe_v_freq
-        self.pin_type = pin_type
+        self.probe_grid = probe_grid
+        self.probe_grid_v = probe_grid_v
+
+        match probe_type:
+            case 'unfirom':
+                self._probe_v = self.uniform_probe_v
+            case 'grid':
+                self._probe_v = self.grid_probe_v
+            case 'combined':
+                self._probe_v = self.combined_probe_v
+            case _:
+                raise ValueError(f"Unknown probe type {probe_type}")
+
         match polarization_type:
             case 'none':
                 pass
@@ -315,6 +331,22 @@ class VortexPoints:
         self.t = 0
         self.omega = 0
         self.A = 0
+    
+    def uniform_probe_v(self):
+        probe_vx = self.probe_v*np.cos(2*np.pi*self.probe_v_freq*self.t)
+        return np.repeat(probe_vx, len(self.vx)), np.zeros_like(self.vy)
+    
+    def grid_probe_v(self):
+        amplitude = self.probe_grid_v*np.cos(2*np.pi*self.probe_v_freq*self.t)
+        n, k = self.probe_grid
+        spatial_x = n*np.cos(np.pi/self.D*n*self.xs)*np.sin(np.pi/self.D*k*self.ys)
+        spatial_y = k*np.sin(np.pi/self.D*n*self.xs)*np.cos(np.pi/self.D*k*self.ys)
+        return amplitude*spatial_x, amplitude*spatial_y
+    
+    def combined_probe_v(self):
+        vxu, vyu = self.uniform_probe_v()
+        vxg, vyg = self.grid_probe_v()
+        return vxu+vxg, vyu+vyg
 
     def plot(self, ax):
         ixp = self.signs > 0
@@ -328,8 +360,9 @@ class VortexPoints:
         else:
             update_velocity_ti(self.xs, self.ys, self.signs, self.vx, self.vy, self.shifts)
         
-        probe_vx = self.probe_v*np.cos(2*np.pi*self.probe_v_freq*self.t)
+        probe_vx, probe_vy = self._probe_v()
         self.vx += probe_vx
+        self.vy += probe_vy
     
     def dissipation(self, alpha=0.1, alphap=0):
         v2 = self.vx**2 + self.vy**2
