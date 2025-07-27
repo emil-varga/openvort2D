@@ -264,7 +264,7 @@ class VortexPoints:
         self.probe_grid_v = probe_grid_v
 
         match probe_type:
-            case 'unfirom':
+            case 'uniform':
                 self._probe_v = self.uniform_probe_v
             case 'grid':
                 self._probe_v = self.grid_probe_v
