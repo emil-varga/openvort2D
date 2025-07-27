@@ -64,15 +64,13 @@ if __name__ == '__main__':
     
     base_output = output
     suffix_k = 1 
-    if os.path.exists(output):
+    if os.path.exists(output) and not args.restart:
         while True:
             output = base_output + f"_{suffix_k}"
             if not os.path.exists(output):
                 break
             suffix_k += 1
-
-    os.makedirs(output)
-
+    
     if args.restart:
         vp_files = glob(path.join(output, '*.npz'))
         vp_files.sort()
@@ -82,6 +80,7 @@ if __name__ == '__main__':
         Lfile_mode = 'a'
         frame = len(vp_files)
     else:
+        os.makedirs(output)    
         vp = VortexPoints(args.N, D, polarization=args.polarization, polarization_type=args.polarization_type,
                           walls=args.walls, vpin=args.pinning_v,
                           probe_v=args.probe_v, probe_v_freq=args.probe_v_freq,

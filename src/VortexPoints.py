@@ -68,20 +68,19 @@ def calculate_velocity_walls_ti(vort_xs: ti.types.ndarray(), vort_ys: ti.types.n
     N = vort_xs.shape[0]
     M = xs.shape[0]
     for j in range(M):
-        if signs[j] == 0:
-            continue
         vx[j] = 0
         vy[j] = 0
         for k in range(N):
+            if signs[k] == 0:
+                continue
             for xshift in range(-1, 2):
                 x_jk = xs[j] - vort_xs[k] + xshift*D
 
                 # no shift
-                if k!=j or xshift!=0:
-                    y_jk = ys[j] - vort_ys[k]
-                    r2_jk = x_jk**2 + y_jk**2
-                    vx[j] += -kappa/2/3.14159/r2_jk*y_jk*signs[k]
-                    vy[j] += kappa/2/3.14159/r2_jk*x_jk*signs[k]
+                y_jk = ys[j] - vort_ys[k]
+                r2_jk = x_jk**2 + y_jk**2
+                vx[j] += -kappa/2/3.14159/r2_jk*y_jk*signs[k]
+                vy[j] += kappa/2/3.14159/r2_jk*x_jk*signs[k]
 
                 #shift up
                 mirror_flip = -1
