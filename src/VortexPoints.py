@@ -328,6 +328,7 @@ class VortexPoints:
         self.shifts = np.array([-D, 0, D])
         self.to_annihilate = np.zeros(N)
         self.t = 0
+        self.step_n = 0
         self.omega = 0
         self.A = 0
     
@@ -369,8 +370,10 @@ class VortexPoints:
         depinned = inv_beta2 > 1
         # x = 1/Gamma
         x = np.where(depinned, np.sqrt(inv_beta2 - 1), 0)
-        alpha_hat = x*(alpha**2 + alpha*x + alphap**2 - 2*alphap + 1)/(alpha**2 + 2*alpha*x + alphap**2 - 2*alphap + x**2 + 1)
-        alphap_hat = (alpha**2 + 2*alpha*x + alphap**2 + alphap*x**2 - 2*alphap + 1)/(alpha**2 + 2*alpha*x + alphap**2 - 2*alphap + x**2 + 1)
+        alpha_hat = x*(alpha**2 + alpha*x + alphap**2 - 2*alphap + 1)
+        alpha_hat /= (alpha**2 + 2*alpha*x + alphap**2 - 2*alphap + x**2 + 1)
+        alphap_hat = (alpha**2 + 2*alpha*x + alphap**2 + alphap*x**2 - 2*alphap + 1)
+        alphap_hat /= (alpha**2 + 2*alpha*x + alphap**2 - 2*alphap + x**2 + 1)
         if self.pin_type == 'threshold':
             mf_vx = np.where(depinned, self.vx + alpha*self.vy*self.signs - alphap*self.vx, 0)
             mf_vy = np.where(depinned, self.vy - alpha*self.vx*self.signs - alphap*self.vy, 0)
@@ -425,8 +428,25 @@ class VortexPoints:
         self.xs += self.vx*dt
         self.ys += self.vy*dt
         self.t += dt
+        self.step_n += 1
+        if self.step_n % 100 == 0:
+            self.cleanup()
     
     def coerce(self):
+        """
+        Adjusts the coordinates of points to ensure they remain within the bounds [0, D) for both x and y axes.
+        This method iterates over all points and, if any coordinate (x or y) falls outside the interval [0, D),
+        it wraps the coordinate around by adding or subtracting D as necessary. The process repeats until all
+        coordinates are within bounds.
+        Attributes used:
+            self.xs (list or array): The x-coordinates of the points.
+            self.ys (list or array): The y-coordinates of the points.
+            self.N (int): The number of points.
+            self.D (float): Simulation domain size
+        """
+        # This function ensures all point coordinates are wrapped into the [0, D) interval, 
+        # simulating periodic boundaries (like a torus).
+
         while True:
             coerced = 0
             for j in range(self.N):
@@ -445,7 +465,22 @@ class VortexPoints:
             if coerced == 0:
                 break
     
+    def cleanup(self):
+        """
+        Removes points that are not active (i.e., have zero vorticity).
+        """
+        ix_nonzero = abs(self.signs) > 0
+        self.xs = self.xs[ix_nonzero]
+        self.ys = self.ys[ix_nonzero]
+        self.vx = self.vx[ix_nonzero]
+        self.vy = self.vy[ix_nonzero]
+        self.signs = self.signs[ix_nonzero]
+        self.N = len(self.xs)
+    
     def trim(self):
+        """
+        Trims the points, which the random initial condition placed outside of the simulation domain.
+        """
         for j in range(self.N):
             if self.xs[j] > self.D or self.xs[j] < 0:
                 self.signs[j] = 0
