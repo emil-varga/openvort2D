@@ -93,6 +93,8 @@ if __name__ == '__main__':
         print(len(vp_files))
         restart_file = np.load(vp_files[-1], allow_pickle=True)
         vp = restart_file['arr_0'].item()
+        if not hasattr(vp, 'step_n'):
+            vp.step_n = 0
         Lfile_mode = 'a'
         frame = len(vp_files)
     else:

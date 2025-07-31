@@ -356,8 +356,8 @@ class VortexPoints:
     def grid_probe_v(self):
         amplitude = self.probe_grid_v*np.cos(2*np.pi*self.probe_v_freq*self.t)
         n, k = self.probe_grid
-        spatial_x = n*np.cos(np.pi/self.D*n*self.xs)*np.sin(np.pi/self.D*k*self.ys)
-        spatial_y = k*np.sin(np.pi/self.D*n*self.xs)*np.cos(np.pi/self.D*k*self.ys)
+        spatial_x = n*np.cos(np.pi/self.D*n*self.xs)*np.cos(np.pi/self.D*k*self.ys)
+        spatial_y = -k*np.sin(np.pi/self.D*n*self.xs)*np.sin(np.pi/self.D*k*self.ys)
         return amplitude*spatial_x, amplitude*spatial_y
     
     def combined_probe_v(self):
