@@ -66,12 +66,24 @@ if __name__ == '__main__':
                         "velocity.")
     parser.add_argument('--variable-save-rate', type=float, default=0,
                         help="Extend the time between saved frames as t_{i+1} = t_{i}*(1 + vsr)")
+    parser.add_argument('--tmax', type=float, default=None,
+                        help="Maximum simulation time. If not set, the simulation runs until all vortices are "
+                        "annihilated.")
     args = parser.parse_args()
     D = args.D
     alpha = args.alpha
     alphap = args.alphap
     output = args.output
     save = args.save
+
+    if args.tmax is not None:
+        if args.tmax <= 0:
+            raise ValueError("tmax must be a positive number.")
+        if args.tmax < args.dt:
+            raise ValueError("tmax must be greater than dt.")
+        tmax = args.tmax
+    else:
+        tmax = np.inf
 
     if args.gpu:
         ti.init(ti.gpu)
@@ -149,6 +161,9 @@ if __name__ == '__main__':
                 save_rate = save_rate*(1 + args.variable_save_rate)
                 save_countdown = int(save_rate)
             if N == 0:
+                break
+            if vp.t >= tmax:
+                print(f"Reached tmax = {tmax}. Stopping simulation.")
                 break
             it += 1
             save_countdown -= 1
