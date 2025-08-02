@@ -340,6 +340,17 @@ class VortexPoints:
                         sign *= -1
                         n += n_bunch
                 self.trim()
+            case 'pairs':
+                sigma = D/grid_div
+                npos = int(N/2)
+                nneg = npos
+                self.xs[:npos] = rand(npos)*D
+                self.xs[npos:] = self.xs[:npos] + randn(nneg)*sigma
+                self.ys[:npos] = rand(npos)*D
+                self.ys[npos:] = self.ys[:npos] + randn(nneg)*sigma
+                self.signs[:npos] = +1
+                self.signs[npos:] = -1
+                self.coerce()
             case _:
                 raise ValueError("Unknown polarization type.")
         self.shifts = np.array([-D, 0, D])
